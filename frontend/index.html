@@ -3,48 +3,74 @@
 <title>GramSetu</title><link rel="manifest" href="manifest.json"><link rel="icon" href="icon.svg"><link rel="stylesheet" href="style.css"></head>
 <body>
 <a class="skip" href="#main" data-i18n="skip"></a>
-<header>
- <h1>GramSetu</h1>
- <select id="lang" aria-label="Language"><option value="en">English</option><option value="hi">हिन्दी</option><option value="ta">தமிழ்</option></select>
- <button id="readpage" class="pill ghost" data-act="readpage" data-i18n-aria="read_page" data-i18n-title="read_page">🔊</button>
- <button id="auth-btn" class="pill ghost" data-act="auth"></button>
- <button id="net" class="pill" data-act="tab" data-arg="queue" role="status" aria-live="polite"></button>
-</header>
-<div id="demo-banner" class="banner hidden" data-i18n="demo_state_off"></div>
-<nav id="tabs" aria-label="GramSetu">
- <button data-act="tab" data-arg="home">🏠 <span data-i18n="n_home"></span></button>
- <button data-act="tab" data-arg="report">📝 <span data-i18n="report"></span></button>
- <button data-act="tab" data-arg="health">🏥 <span data-i18n="n_health"></span></button>
- <button data-act="tab" data-arg="farm">🌾 <span data-i18n="n_farm"></span></button>
- <button data-act="tab" data-arg="docs">📄 <span data-i18n="n_docs"></span></button>
- <button data-act="tab" data-arg="sos" class="sos-tab">🚨 <span data-i18n="n_sos"></span></button>
- <button data-act="tab" data-arg="schemes">📋 <span data-i18n="schemes"></span></button>
- <button data-act="tab" data-arg="queue">🔄 <span data-i18n="n_queue"></span></button>
- <button data-act="tab" data-arg="admin" id="tab-admin" class="hidden">🛠 <span data-i18n="n_admin"></span></button>
-</nav>
-<main id="main" tabindex="-1">
-<section id="home"></section>
-<section id="report" class="hidden">
- <form id="report-form" novalidate>
- <label for="name" data-i18n="name"></label><input id="name" autocomplete="name">
- <label for="village" data-i18n="village"></label><input id="village">
- <label for="text" data-i18n="text"></label><textarea id="text" aria-describedby="hint"></textarea>
- <div class="row"><button type="button" class="btn alt" id="mic"></button><button type="button" class="btn ghost" id="speak"></button><button type="button" class="btn ghost stop-speak" data-act="stopspeak" data-i18n="stop_speak"></button></div>
- <div id="listening" class="listening hidden" role="status" data-i18n="v_listening"></div>
- <div id="hint" aria-live="polite"></div>
- <div class="row"><button class="btn" id="send" type="submit"></button></div>
- </form>
-</section>
-<section id="health" class="hidden"></section>
-<section id="farm" class="hidden"></section>
-<section id="docs" class="hidden"></section>
-<section id="sos" class="hidden"></section>
-<section id="schemes" class="hidden"></section>
-<section id="queue" class="hidden"></section>
-<section id="admin" class="hidden"></section>
-</main>
+<div class="app-shell">
+  <aside class="sidebar" aria-label="Main navigation">
+    <div class="brand-block">
+      <div class="brand-mark" aria-hidden="true">G</div>
+      <div>
+        <div class="brand-name">GramSetu</div>
+        <div class="brand-tag">Bridging rural communities</div>
+      </div>
+    </div>
+    <div id="demo-banner" class="banner hidden" data-i18n="demo_state_off"></div>
+    <nav id="tabs" aria-label="GramSetu">
+      <button data-act="tab" data-arg="home">🏠 <span data-i18n="n_home"></span></button>
+      <button data-act="tab" data-arg="report">📝 <span data-i18n="report"></span></button>
+      <button data-act="tab" data-arg="health">🏥 <span data-i18n="n_health"></span></button>
+      <button data-act="tab" data-arg="farm">🌾 <span data-i18n="n_farm"></span></button>
+      <button data-act="tab" data-arg="docs">📄 <span data-i18n="n_docs"></span></button>
+      <button data-act="tab" data-arg="sos" class="sos-tab">🚨 <span data-i18n="n_sos"></span></button>
+      <button data-act="tab" data-arg="schemes">📋 <span data-i18n="schemes"></span></button>
+      <button data-act="tab" data-arg="queue">🔄 <span data-i18n="n_queue"></span></button>
+      <button data-act="tab" data-arg="admin" id="tab-admin" class="hidden">🛠 <span data-i18n="n_admin"></span></button>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="service-badge">Offline-ready citizen services</div>
+    </div>
+  </aside>
+  <div class="content-panel">
+    <header class="topbar">
+      <div class="page-breadcrumb">GramSetu / Public Service Portal</div>
+      <div class="header-copy">
+        <p class="eyebrow">Digital village services</p>
+        <h1 id="page-title">Dashboard</h1>
+      </div>
+      <div class="header-tools">
+        <div class="lang-wrap">
+          <label for="lang">Language</label>
+          <select id="lang" aria-label="Language"><option value="en">English</option><option value="hi">हिन्दी</option><option value="ta">தமிழ்</option></select>
+        </div>
+        <button id="readpage" class="topbar-btn" data-act="readpage" data-i18n-aria="read_page" data-i18n-title="read_page" aria-label="Read this page aloud">🔊</button>
+        <button id="profile-btn" class="topbar-btn secondary" type="button">Profile</button>
+        <button id="auth-btn" class="topbar-btn primary" data-act="auth" type="button">Log in</button>
+        <button id="net" class="pill" data-act="tab" data-arg="queue" role="status" aria-live="polite"></button>
+      </div>
+    </header>
+    <main id="main" tabindex="-1">
+      <section id="home"></section>
+      <section id="report" class="hidden">
+       <form id="report-form" novalidate>
+       <label for="name" data-i18n="name"></label><input id="name" autocomplete="name">
+       <label for="village" data-i18n="village"></label><input id="village">
+       <label for="text" data-i18n="text"></label><textarea id="text" aria-describedby="hint"></textarea>
+       <div class="row"><button type="button" class="btn alt" id="mic"></button><button type="button" class="btn ghost" id="speak"></button><button type="button" class="btn ghost stop-speak" data-act="stopspeak" data-i18n="stop_speak"></button></div>
+       <div id="listening" class="listening hidden" role="status" data-i18n="v_listening"></div>
+       <div id="hint" aria-live="polite"></div>
+       <div class="row"><button class="btn" id="send" type="submit"></button></div>
+       </form>
+      </section>
+      <section id="health" class="hidden"></section>
+      <section id="farm" class="hidden"></section>
+      <section id="docs" class="hidden"></section>
+      <section id="sos" class="hidden"></section>
+      <section id="schemes" class="hidden"></section>
+      <section id="queue" class="hidden"></section>
+      <section id="admin" class="hidden"></section>
+    </main>
+  </div>
+</div>
 <div id="toast" role="status" aria-live="polite"></div>
-<button id="chat-fab" class="fab" data-act="chat" data-i18n-aria="chat_open" data-i18n-title="chat_open">💬</button>
+<button id="chat-fab" class="fab" data-act="chat" data-i18n-aria="chat_open" data-i18n-title="chat_open">🤖 <span data-i18n="assistant_fab">GramSetu Assistant</span></button>
 <aside id="chat" class="hidden" role="dialog" aria-labelledby="chat-title">
  <div class="chat-head"><strong id="chat-title" data-i18n="chat_title"></strong>
   <span><button class="pill ghost stop-speak" data-act="stopspeak" data-i18n="stop_speak"></button>

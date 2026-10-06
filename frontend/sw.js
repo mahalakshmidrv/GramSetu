@@ -1,5 +1,5 @@
 // GramSetu service worker. Bump VERSION on every release: old caches are deleted on activate.
-const VERSION = "v2", SHELL = "gramsetu-shell-" + VERSION, DATA = "gramsetu-data-" + VERSION;
+const VERSION = "v3", SHELL = "gramsetu-shell-" + VERSION, DATA = "gramsetu-data-" + VERSION;
 const FILES = ["/", "/index.html", "/app.js", "/i18n.js", "/content.js", "/style.css", "/manifest.json", "/icon.svg"];
 const PUBLIC_API = ["/api/schemes"];          // only non-private API answers may be cached
 self.addEventListener("install", e => {

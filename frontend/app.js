@@ -228,18 +228,73 @@ const helpCards = list => list.map(h => `<a class="call" href="tel:${h.num.repla
 
 // ---------- views ----------
 let cur = "home"; const sub = { health: "main", farm: "main" };
+let dashboardStats = { total: 0, by_category: {} };
 const profile = () => { const u = auth.user; if (!u) return { name: "", village: "" }; const p = ls.get("gs_profile_" + u.id, {}); return { name: p.name || u.name || "", village: p.village || u.village || "" }; };
 const saveProfile = (name, village) => { if (auth.user) ls.set("gs_profile_" + auth.user.id, { name, village }); };
 const resetForms = () => { const p = profile(); $("name").value = p.name; $("village").value = p.village; $("text").value = ""; $("hint").textContent = ""; };
 const tile = (ic, label, desc, act, arg, cls = "") => `<button class="tile ${cls}" data-act="${act}" data-arg="${arg}"><span class="ic" aria-hidden="true">${ic}</span><b>${label}</b>${desc ? `<span>${desc}</span>` : ""}</button>`;
+const statCard = (label, value) => `<div class="stat-box"><strong>${esc(String(value))}</strong><span>${esc(label)}</span></div>`;
+async function loadDashboardStats() {
+  try { dashboardStats = await api("/api/stats"); }
+  catch { dashboardStats = { total: 0, by_category: {} }; }
+}
 function renderHome() {
-  $("home").innerHTML = `<p>${t("home_intro")}</p><div class="tiles">
-   ${tile("📝", t("report"), t("h_report_d"), "tab", "report")}${tile("🏥", t("n_health"), t("h_health_d"), "tab", "health")}${tile("🌾", t("n_farm"), t("h_farm_d"), "tab", "farm")}
-   ${tile("📄", t("n_docs"), t("h_docs_d"), "tab", "docs")}${tile("📋", t("schemes"), t("h_schemes_d"), "tab", "schemes")}${tile("🔄", t("n_queue"), t("h_queue_d"), "tab", "queue")}
-   ${tile("🚨", t("n_sos"), t("h_sos_d"), "tab", "sos", "red")}</div>
-   <div class="card sync-card"></div>
-   <details><summary>🎬 ${t("demo_title")}</summary><p>${t("demo_steps")}</p>
-   <div class="row"><button class="btn ${forced ? "" : "alt"}" data-act="demo">${forced ? t("demo_on") : t("demo_off")}</button></div></details>`;
+  const pendingSync = Q.filter(i => vis(i) && ["pending", "syncing"].includes(i.status)).length;
+  const totalRequests = Number(dashboardStats.total || 0);
+  const healthRequests = Number(dashboardStats.by_category?.health || 0);
+  const farmingRequests = Number(dashboardStats.by_category?.farming || 0);
+  const otherRequests = Math.max(0, totalRequests - healthRequests - farmingRequests);
+  const offlineText = pendingSync ? t("pending_sync", { n: pendingSync }) : t("no_pending_sync");
+  $("home").innerHTML = `
+    <div class="hero-panel">
+      <div class="hero-copy">
+        <p class="eyebrow">GRAMSETU</p>
+        <h2>${t("service_home_hero")}</h2>
+        <p>${t("service_home_subtitle")}</p>
+        <div class="hero-actions">
+          <button class="btn" data-act="tab" data-arg="schemes">${t("service_explore")}</button>
+          <button class="btn alt" data-act="tab" data-arg="sos">${t("service_emergency")}</button>
+        </div>
+      </div>
+      <div class="hero-stats">
+        <div class="stat"><b>${esc(String(totalRequests))}</b><span>${t("stats_total")}</span></div>
+        <div class="stat"><b>${esc(String(healthRequests))}</b><span>${t("stats_health")}</span></div>
+        <div class="stat"><b>${esc(String(farmingRequests))}</b><span>${t("stats_farming")}</span></div>
+        <div class="stat"><b>${esc(String(otherRequests))}</b><span>${t("stats_other")}</span></div>
+      </div>
+    </div>
+    <div class="service-grid">
+      <div class="service-card"><div class="service-icon">🏛</div><h3>${t("service_gov")}</h3><p>${t("service_gov_desc")}</p><button class="btn ghost" data-act="tab" data-arg="schemes">${t("service_explore_btn")}</button></div>
+      <div class="service-card"><div class="service-icon">🌾</div><h3>${t("service_farm")}</h3><p>${t("service_farm_desc")}</p><button class="btn ghost" data-act="tab" data-arg="farm">${t("service_explore_btn")}</button></div>
+      <div class="service-card"><div class="service-icon">🏥</div><h3>${t("service_health")}</h3><p>${t("service_health_desc")}</p><button class="btn ghost" data-act="tab" data-arg="health">${t("service_support_btn")}</button></div>
+      <div class="service-card"><div class="service-icon">📄</div><h3>${t("service_docs")}</h3><p>${t("service_docs_desc")}</p><button class="btn ghost" data-act="tab" data-arg="docs">${t("service_docs_btn")}</button></div>
+      <div class="service-card danger-card"><div class="service-icon">🚨</div><h3>${t("service_sos")}</h3><p>${t("service_sos_desc")}</p><button class="btn danger" data-act="tab" data-arg="sos">${t("service_sos_btn")}</button></div>
+      <div class="service-card"><div class="service-icon">🤖</div><h3>${t("service_offline")}</h3><p>${t("service_offline_desc")}</p><button class="btn ghost" data-act="chat">${t("service_assistant_btn")}</button></div>
+    </div>
+    <div class="card status-card">
+      <div class="status-head">
+        <div>
+          <div class="status-marker">●</div>
+          <span>${t("offline_ready")}</span>
+        </div>
+      </div>
+      <p>${t("offline_ready_desc")}</p>
+      <div class="offline-queue">${esc(offlineText)}</div>
+    </div>
+    <div class="stats-grid">
+      ${statCard(t("stats_total"), totalRequests)}
+      ${statCard(t("stats_health"), healthRequests)}
+      ${statCard(t("stats_farming"), farmingRequests)}
+      ${statCard(t("stats_other"), otherRequests)}
+    </div>
+    <div class="card sos-card">
+      <h3>${t("urgent_help")}</h3>
+      <p>${t("sos_benefit")}</p>
+      <button class="sos-btn" data-act="tab" data-arg="sos">${t("service_sos_btn")}</button>
+    </div>
+    <div class="card sync-card"></div>
+    <details><summary>🎬 ${t("demo_title")}</summary><p>${t("demo_steps")}</p>
+    <div class="row"><button class="btn ${forced ? "" : "alt"}" data-act="demo">${forced ? t("demo_on") : t("demo_off")}</button></div></details>`;
   updateStatus();
 }
 function subnav(sec, items) {
@@ -359,8 +414,10 @@ async function showTab(tab) {
   document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.arg === tab));
   if (tab === "admin") { await loadAdmin(); window.GSAdmin.open($("admin")); }
   else VIEWS[tab] && VIEWS[tab]();
+  if (tab === "home") loadDashboardStats().then(() => cur === tab && renderHome());
   if (tab === "schemes" || tab === "health" || tab === "farm") loadSchemes().then(() => cur === tab && VIEWS[tab]());
   if (tab === "queue") refreshStatuses();
+  renderAuthBtn();
   scrollTo(0, 0);
 }
 let adminLoad; const loadAdmin = () => adminLoad ||= new Promise((res, rej) => { const s = document.createElement("script"); s.src = "admin.js"; s.onload = res; s.onerror = () => { adminLoad = null; rej(); }; document.head.appendChild(s); });
@@ -375,7 +432,18 @@ function applyI18n() {
   $("chat-mic").setAttribute("aria-label", t("mic")); $("lang").setAttribute("aria-label", t("lang_label"));
   renderAuthBtn(); renderChips(); showCat();
 }
-function renderAuthBtn() { updateStatus(); const u = auth.user, b = $("auth-btn"); b.textContent = u ? t("logout") : t("login"); b.title = u ? t("logged_as", { n: u.name || u.username }) : ""; $("tab-admin").classList.toggle("hidden", !isStaff()); }
+function renderAuthBtn() {
+  updateStatus();
+  const u = auth.user;
+  const b = $("auth-btn");
+  b.textContent = u ? t("logout") : t("login");
+  b.title = u ? t("logged_as", { n: u.name || u.username }) : "";
+  const profileBtn = $("profile-btn");
+  if (profileBtn) profileBtn.textContent = u ? (u.name || u.username) : "Profile";
+  const pageTitle = $("page-title");
+  if (pageTitle) pageTitle.textContent = { home: "Dashboard", report: "Report", health: "Healthcare", farm: "Farmer Support", docs: "Documents", sos: "Emergency", schemes: "Schemes", queue: "Offline Queue" }[cur] || "Dashboard";
+  $("tab-admin").classList.toggle("hidden", !isStaff());
+}
 const showCat = () => { const v = $("text").value; $("hint").textContent = v ? `${t("detected")} ${t("cat_" + classify(v))}` : ""; };
 
 // ---------- forms ----------
