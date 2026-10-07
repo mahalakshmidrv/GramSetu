@@ -574,7 +574,11 @@ addEventListener("offline", updateStatus);
 addEventListener("pagehide", () => { stopSpeaking(); stopListening(); });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && chatOpen()) closeChat(); });
 setInterval(() => { if (!document.hidden) flush(); }, 30000);        // retry pending items, notice reconnection (navigator.onLine can be wrong)
-if ("serviceWorker" in navigator) { navigator.serviceWorker.register("/sw.js"); navigator.serviceWorker.addEventListener("message", e => e.data === "flush" && flush()); }
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" });
+  navigator.serviceWorker.addEventListener("controllerchange", () => window.location.reload());
+  navigator.serviceWorker.addEventListener("message", e => e.data === "flush" && flush());
+}
 
 // ---------- boot ----------
 (async () => {
