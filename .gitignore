@@ -7,3 +7,12 @@ backend/uploads/
 .vscode/
 
 .venv/
+
+# Flutter / Mobile
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+**/ephemeral/
+*.iml
