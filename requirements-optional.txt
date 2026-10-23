@@ -1,0 +1,2 @@
+# Optional dependency for the separate Streamlit demo only; not required by the FastAPI/PWA app.
+streamlit>=1.35,<2.0

@@ -405,7 +405,21 @@ async function sendSos() {
   } finally { sosBusy = false; $("sos-yes").disabled = false; }
 }
 // ---------- navigation / rendering ----------
-const VIEWS = { home: renderHome, report: () => {}, health: renderHealth, farm: renderFarm, docs: renderDocs, sos: renderSos, schemes: renderSchemesTab, queue: renderQueue };
+const VIEWS = {
+  home: renderHome,
+  report: () => {},
+  health: renderHealth,
+  farm: renderFarm,
+  docs: renderDocs,
+  sos: () => window.GSOfflineComm?.renderSos ? window.GSOfflineComm.renderSos($("sos")) : renderSos(),
+  vault: () => window.GSOfflineComm?.renderVault($("vault")),
+  schemes: renderSchemesTab,
+  queue: renderQueue,
+  neighbors: () => window.GSOfflineComm?.renderContacts($("neighbors")),
+  nearby: () => window.GSOfflineComm?.renderNearby($("nearby")),
+  messages: () => window.GSOfflineComm?.renderMessages($("messages"))
+};
+window.api = api; window.auth = auth; window.toast = toast; window.GSShowTab = showTab;
 async function showTab(tab) {
   stopSpeaking();
   if (tab === "admin" && !isStaff()) tab = "home";
@@ -441,7 +455,20 @@ function renderAuthBtn() {
   const profileBtn = $("profile-btn");
   if (profileBtn) profileBtn.textContent = u ? (u.name || u.username) : "Profile";
   const pageTitle = $("page-title");
-  if (pageTitle) pageTitle.textContent = { home: "Dashboard", report: "Report", health: "Healthcare", farm: "Farmer Support", docs: "Documents", sos: "Emergency", schemes: "Schemes", queue: "Offline Queue" }[cur] || "Dashboard";
+  if (pageTitle) pageTitle.textContent = {
+    home: "Dashboard",
+    report: "Report",
+    health: "Healthcare",
+    farm: "Farmer Support",
+    docs: "Documents",
+    sos: "Emergency SOS",
+    vault: "Offline Vault",
+    neighbors: "My Village Contacts",
+    nearby: "Nearby Connect",
+    messages: "Offline Messages",
+    schemes: "Schemes",
+    queue: "Offline Queue"
+  }[cur] || "Dashboard";
   $("tab-admin").classList.toggle("hidden", !isStaff());
 }
 const showCat = () => { const v = $("text").value; $("hint").textContent = v ? `${t("detected")} ${t("cat_" + classify(v))}` : ""; };
@@ -532,6 +559,7 @@ document.addEventListener("click", async e => {
     case "tab": if (chatOpen() && b.closest("#chat")) closeChat(); return showTab(arg);
     case "sub": { const [s, k] = arg.split(":"); sub[s] = k; return VIEWS[s](); }
     case "sync": return flush(true);
+    case "vault-export": return window.GSOfflineComm?.exportBackup();
     case "retry": { const it = Q.find(i => i.client_request_id === arg); if (it) { it.status = "pending"; it.error = ""; await qPut(it); toast(t("msg_retry")); await refreshQ(); renderCurrent(); flush(); } return; }
     case "retryall": for (const it of Q.filter(i => i.status === "failed")) { it.status = "pending"; it.error = ""; await qPut(it); } await refreshQ(); renderCurrent(); return flush();
     case "del": if (confirm(t("confirm_del"))) { await qDel(arg); await fDel(arg); await refreshQ(); toast(t("msg_deleted")); renderCurrent(); } return;

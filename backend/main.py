@@ -10,7 +10,7 @@ from typing import List, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, ValidationError
 
@@ -87,13 +87,40 @@ def init_db():
         c.execute("""CREATE TABLE IF NOT EXISTS sync_history(
             id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, user_id INTEGER REFERENCES users(id),
             received INTEGER, created INTEGER, duplicates INTEGER, rejected INTEGER)""")
+        c.execute("""CREATE TABLE IF NOT EXISTS announcements(
+            id TEXT PRIMARY KEY, title TEXT NOT NULL, content TEXT NOT NULL,
+            category TEXT NOT NULL DEFAULT 'general', author_role TEXT DEFAULT 'ADMIN',
+            created_at INTEGER NOT NULL, expires_at INTEGER)""")
+        c.execute("""CREATE TABLE IF NOT EXISTS offline_messages(
+            id TEXT PRIMARY KEY, sender_id INTEGER REFERENCES users(id),
+            sender_name TEXT, recipient_id TEXT NOT NULL, recipient_name TEXT,
+            body TEXT NOT NULL, transport TEXT DEFAULT 'backend',
+            status TEXT DEFAULT 'pending_delivery',
+            created_at INTEGER NOT NULL, delivered_at INTEGER, ack_at INTEGER)""")
+        c.execute("""CREATE TABLE IF NOT EXISTS sos_alerts(
+            id TEXT PRIMARY KEY, user_id INTEGER REFERENCES users(id),
+            name TEXT, village TEXT, phone TEXT, latitude REAL, longitude REAL,
+            location_note TEXT, text TEXT, lang TEXT DEFAULT 'en',
+            status TEXT DEFAULT 'Received',
+            created_at INTEGER NOT NULL, resolved_at INTEGER, updated_at INTEGER)""")
+        c.execute("""CREATE TABLE IF NOT EXISTS vault_resources(
+            key TEXT PRIMARY KEY, category TEXT NOT NULL,
+            title_en TEXT NOT NULL, title_hi TEXT, title_ta TEXT,
+            body_en TEXT NOT NULL, body_hi TEXT, body_ta TEXT,
+            icon TEXT, updated_at INTEGER NOT NULL)""")
         for ddl in ("CREATE INDEX IF NOT EXISTS ix_req_status ON requests(status)",
                     "CREATE INDEX IF NOT EXISTS ix_req_type ON requests(type)",
                     "CREATE INDEX IF NOT EXISTS ix_req_user ON requests(user_id)",
                     "CREATE INDEX IF NOT EXISTS ix_req_created ON requests(created_at)",
                     "CREATE INDEX IF NOT EXISTS ix_req_assigned ON requests(assigned_to)",
                     "CREATE INDEX IF NOT EXISTS ix_doc_user ON documents(user_id)",
-                    "CREATE INDEX IF NOT EXISTS ix_sess_exp ON sessions(expires_at)"):
+                    "CREATE INDEX IF NOT EXISTS ix_sess_exp ON sessions(expires_at)",
+                    "CREATE INDEX IF NOT EXISTS ix_ann_created ON announcements(created_at)",
+                    "CREATE INDEX IF NOT EXISTS ix_msg_recip ON offline_messages(recipient_id)",
+                    "CREATE INDEX IF NOT EXISTS ix_msg_sender ON offline_messages(sender_id)",
+                    "CREATE INDEX IF NOT EXISTS ix_sos_status ON sos_alerts(status)",
+                    "CREATE INDEX IF NOT EXISTS ix_sos_created ON sos_alerts(created_at)",
+                    "CREATE INDEX IF NOT EXISTS ix_res_cat ON vault_resources(category)"):
             c.execute(ddl)
 
 # ---------------------------------------------------------------- passwords / sessions
@@ -134,8 +161,59 @@ def seed_staff():
             create_user(c, ou, op, "OFFICER", "Officer")
             print(f"[GramSetu] Officer account created: username={ou}")
 
+def seed_vault():
+    """Seed initial announcements and offline vault guides if table is empty."""
+    with db() as c:
+        if not c.execute("SELECT 1 FROM announcements LIMIT 1").fetchone():
+            now = now_ms()
+            c.execute("INSERT INTO announcements(id,title,content,category,author_role,created_at,expires_at) VALUES(?,?,?,?,?,?,?)",
+                      ("ann-water-1", "Gram Panchayat Water Supply Notice", "Drinking water supply will be active daily from 6:00 AM to 8:30 AM and 5:00 PM to 7:00 PM. Please report any pipeline leakages in the Report tab.", "water", "ADMIN", now, None))
+            c.execute("INSERT INTO announcements(id,title,content,category,author_role,created_at,expires_at) VALUES(?,?,?,?,?,?,?)",
+                      ("ann-health-1", "Free Village Health & Immunization Camp", "Free health checkup, maternal wellness screening, and child immunization camp this Friday at the Village Primary Health Sub-Centre from 9 AM to 2 PM.", "health", "ADMIN", now, None))
+            c.execute("INSERT INTO announcements(id,title,content,category,author_role,created_at,expires_at) VALUES(?,?,?,?,?,?,?)",
+                      ("ann-farm-1", "PM-KISAN e-KYC and Soil Testing Drive", "All farmers are requested to verify their PM-KISAN biometric e-KYC before next month. Free soil health card sample collection is now open at the Agriculture Extension Counter.", "farming", "ADMIN", now, None))
+        
+        if not c.execute("SELECT 1 FROM vault_resources LIMIT 1").fetchone():
+            now = now_ms()
+            resources = [
+                ("first-aid", "first_aid",
+                 "Emergency First Aid Guide",
+                 "आपातकालीन प्राथमिक चिकित्सा गाइड",
+                 "அவசர முதலுதவி வழிகாட்டி",
+                 "1. Heavy Bleeding: Apply firm, continuous pressure with a clean cloth. Elevate the wounded limb. Do not remove embedded objects.\n2. Heat Stroke: Move person to shade, loosen clothing, fan them, apply cool damp cloth to forehead and neck. Give sips of cool water if conscious.\n3. Snake Bite: Keep the victim calm and still. Immobilize the bitten limb below heart level. DO NOT cut the wound or try to suck venom. Reach nearest hospital immediately via 108 ambulance.\n4. Burns: Pour cool clean running water over burn for 10-15 minutes. Cover loosely with clean cloth.\n5. Choking: Give 5 back blows between shoulder blades followed by upward abdominal thrusts.\n6. Child Diarrhea/Dehydration: Prepare ORS (1 packet in 1 litre boiled cool water) or mix 6 teaspoons sugar + 1/2 teaspoon salt in 1 litre water. Feed small sips frequently.",
+                 "1. तेज खून बहना: साफ कपड़े से लगातार दबाएं। चोट वाले अंग को ऊपर उठाएं।\n2. लू लगना: छाया में ले जाएं, कपड़े ढीले करें, गीला कपड़ा रखें।\n3. सांप का काटना: पीड़ित को शांत रखें, अंग न हिलाएं। घाव को काटें नहीं। तुरंत 108 पर कॉल कर अस्पताल ले जाएं।\n4. जलना: 10-15 मिनट साफ ठंडा पानी डालें। साफ कपड़े से ढकें।\n5. ओआरएस घोल: 1 लीटर पानी में 6 चम्मच चीनी और आधा चम्मच नमक मिलाएं।",
+                 "1. அதிக ரத்தப்போக்கு: சுத்தமான துணியால் தொடர்ந்து அழுத்தவும். காயமடைந்த பகுதியை உயர்த்தவும்.\n2. வெப்ப பக்கவாதம்: நிழலில் படுக்க வைக்கவும், குளிர்ந்த நீர் தெளிக்கவும்.\n3. பாம்பு கடி: அமைதியாக இருக்கவும், காலையோ கையையோ அசைக்க வேண்டாம். காயத்தை வெட்டவோ உறிஞ்சவோ கூடாது. உடனடியாக 108 ஆம்புலன்ஸ் மூலம் மருத்துவமனைக்கு செல்லவும்.\n4. தீக்காயம்: 10-15 நிமிடம் குளிர்ந்த நீர் ஊற்றவும்.\n5. ஓ.ஆர்.எஸ் (ORS): 1 லிட்டர் நீரில் 6 தேக்கரண்டி சர்க்கரை + 1/2 தேக்கரண்டி உப்பு கலந்து குடிக்க கொடுக்கவும்.",
+                 "🩹", now),
+                ("health-centres", "health_centre",
+                 "Village Health Centres & Medical Contacts",
+                 "ग्राम स्वास्थ्य केंद्र एवं डॉक्टर संपर्क",
+                 "கிராம சுகாதார நிலையங்கள் மற்றும் மருத்துவ தொடர்புகள்",
+                 "• Primary Health Sub-Centre: Open Mon-Sat 9 AM - 4 PM. ANM Nurse & ASHA Worker available for immunization, maternal checkups, and basic medicines.\n• Primary Health Centre (PHC): Open 24/7 for emergency delivery & stabilization. Medical Officer on duty. Free medicines & laboratory tests.\n• Community Health Centre (CHC): 30-bed hospital with surgeon, physician, gynecologist, and pediatric care.\n• Emergency Ambulance Helpline: Dial 108 (Toll Free, 24/7).\n• Pregnant Mother & Infant Ambulance: Dial 102.\n• National Emergency Helpline: Dial 112.",
+                 "• प्राथमिक स्वास्थ्य उप-केंद्र: सोम-शनि सुबह 9 से शाम 4 बजे। एएनएम और आशा कार्यकर्ता उपलब्ध।\n• प्राथमिक स्वास्थ्य केंद्र (PHC): 24 घंटे खुला। मुफ्त दवाइयां और जांच।\n• सामुदायिक स्वास्थ्य केंद्र (CHC): विशेषज्ञ डॉक्टर और 30 बेड का अस्पताल।\n• एम्बुलेंस हेल्पलाइन: 108 (निःशुल्क, 24 घंटे)।\n• मातृ-शिशु एम्बुलेंस: 102।\n• राष्ट्रीय आपातकालीन नंबर: 112।",
+                 "• ஆரம்ப சுகாதார துணை நிலையம்: திங்கள்-சனி காலை 9 முதல் மாலை 4 வரை. ஏஎன்எம் செவிலியர் மற்றும் ஆஷா பணியாளர்.\n• ஆரம்ப சுகாதார நிலையம் (PHC): 24 மணி நேரமும் செயல்படுகிறது. அவசர சிகிச்சை மற்றும் பிரசவம்.\n• சமூக சுகாதார மையம் (CHC): 30 படுக்கைகள் மற்றும் சிறப்பு மருத்துவர்கள்.\n• அவசர ஆம்புலன்ஸ்: 108 (இலவசம், 24/7).\n• தாய்-சேய் ஆம்புலன்ஸ்: 102.\n• அவசர உதவி எண்: 112.",
+                 "🏥", now),
+                ("crop-care", "crop_care",
+                 "Farmer Crop Care & Pest Advisory",
+                 "किसान फसल सुरक्षा एवं कीट प्रबंधन",
+                 "விவசாய பயிர் பாதுகாப்பு மற்றும் பூச்சி மேலாண்மை",
+                 "• Paddy (Rice): Watch for stem borer and leaf folder. Maintain 2-3 cm water level; drain water for 2 days if root rot appears. Use neem-based organic repellents.\n• Millets & Maize: Excellent drought tolerance. Ensure good drainage; avoid water stagnation. Apply organic farmyard manure before sowing.\n• Cotton: Inspect underside of leaves for whitefly and aphids. Install yellow sticky traps (5-6 traps per acre).\n• Pulses (Tur, Moong, Urad): Treat seeds with Rhizobium culture before sowing to enhance natural soil nitrogen fixation.\n• Soil Health Card Advisory: Test soil every 2 years. Reduce excess urea; balance with phosphorus, potassium and zinc.\n• Kisan Call Centre Helpline: 1800-180-1551 (Toll Free, 6 AM to 10 PM daily).",
+                 "• धान: तना छेदक और पत्ती लपेटक पर नजर रखें। नीम आधारित कीटनाशक का प्रयोग करें।\n• मोटे अनाज और मक्का: कम पानी में अच्छी पैदावार। जल निकासी का ध्यान रखें।\n• कपास: सफेद मक्खी के लिए पीले स्टिकी ट्रैप लगाएं।\n• दलहन: बुवाई से पहले राइजोबियम से बीज उपचार करें।\n• किसान कॉल सेंटर: 1800-180-1551 (सुबह 6 से रात 10 बजे)।",
+                 "• நெல்: தண்டு துளைப்பான் மற்றும் இலை சுருட்டுப் புழுவை கண்காணிக்கவும். வேப்ப எண்ணெய் கரைசல் தெளிக்கவும்.\n• சிறுதானியங்கள் மற்றும் மக்காச்சோளம்: குறைந்த நீரில் அதிக மகசூல் தரும். நீர் தேங்காமல் பார்த்துக் கொள்ளவும்.\n• பருத்தி: வெள்ளை ஈக்களை கட்டுப்படுத்த ஏக்கருக்கு 5-6 மஞ்சள் நிற ஒட்டும் பொறிகளை வைக்கவும்.\n• பயறு வகைகள்: விதைப்பதற்கு முன் ரைசோபியம் கொண்டு விதை நேர்த்தி செய்யவும்.\n• கிசான் கால் சென்டர்: 1800-180-1551 (காலை 6 முதல் இரவு 10 வரை).",
+                 "🌾", now),
+                ("gov-services", "government_service",
+                 "Key Government Welfare Schemes & Offline Guide",
+                 "प्रमुख सरकारी योजनाएं एवं ऑफलाइन गाइड",
+                 "முக்கிய அரசு நலத்திட்டங்கள் மற்றும் ஆஃப்லைன் வழிகாட்டி",
+                 "• PM-KISAN: Rs 6,000 yearly in 3 installments for farmer families. Requires Aadhaar-linked bank account.\n• Ayushman Bharat (PM-JAY): Up to Rs 5 lakh annual cashless health cover per eligible family for secondary and tertiary hospitalization.\n• MGNREGA: 100 days guaranteed wage employment per financial year for rural households.\n• Jal Jeevan Mission: Functional household tap water connection for every rural home.\n• NSAP Social Pensions: Monthly pensions for elderly (IGNOAPS), widows (IGNWPS), and persons with disabilities (IGNDPS).",
+                 "• पीएम-किसान: किसान परिवारों को प्रति वर्ष 6,000 रुपये 3 किश्तों में।\n• आयुष्मान भारत: प्रति परिवार सालाना 5 लाख रुपये तक का मुफ्त इलाज।\n• मनरेगा: ग्रामीण परिवारों को 100 दिन का गारंटीशुदा रोजगार।\n• जल जीवन मिशन: हर ग्रामीण घर तक नल से जल।\n• राष्ट्रीय पेंशन: बुजुर्गों, विधवाओं और दिव्यांगों के लिए मासिक पेंशन।",
+                 "• பிஎம்-கிசான்: விவசாய குடும்பங்களுக்கு ஆண்டுக்கு ரூ.6,000 மூன்று தவணைகளில்.\n• ஆயுஷ்மான் பாரத்: குடும்பத்திற்கு ஆண்டுக்கு ரூ.5 லட்சம் வரை இலவச மருத்துவ சிகிச்சை.\n• மகாத்மா காந்தி வேலை உறுதி (100 நாள் வேலை): கிராமப்புற குடும்பங்களுக்கு உத்தரவாதமான வேலை.\n• ஜல் ஜீவன் மிஷன்: அனைத்து கிராம வீடுகளுக்கும் குழாய் குடிநீர்.\n• தேசிய ஓய்வூதியம்: முதியோர், விதவைகள் மற்றும் மாற்றுத்திறனாளிகளுக்கான மாத ஓய்வூதியம்.",
+                 "📋", now)
+            ]
+            c.executemany("INSERT INTO vault_resources(key,category,title_en,title_hi,title_ta,body_en,body_hi,body_ta,icon,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)", resources)
+
 init_db()
 seed_staff()
+seed_vault()
 _DUMMY = hash_pw("dummy-password")
 
 # ---------------------------------------------------------------- rate limit (in memory, per IP)
@@ -272,6 +350,41 @@ class StatusBody(BaseModel):
 class UserPatch(BaseModel):
     role: Optional[str] = None
     active: Optional[bool] = None
+
+class AnnouncementBody(BaseModel):
+    id: Optional[str] = None
+    title: str = Field(min_length=1, max_length=200)
+    content: str = Field(min_length=1, max_length=4000)
+    category: str = Field("general", max_length=50)
+    expires_at: Optional[int] = None
+
+class MessageSendBody(BaseModel):
+    id: str = Field(pattern=ID_RE)
+    recipient_id: str = Field(min_length=1, max_length=100)
+    recipient_name: Optional[str] = Field("", max_length=100)
+    body: str = Field(min_length=1, max_length=4000)
+    transport: Optional[str] = Field("backend", max_length=30)
+    created_at: int = Field(gt=0)
+
+class MessageAckBody(BaseModel):
+    message_id: str = Field(pattern=ID_RE)
+    status: str = Field("delivered", pattern=r"^(delivered|read|acknowledged)$")
+
+class SosBody(BaseModel):
+    id: str = Field(pattern=ID_RE)
+    name: Optional[str] = Field("", max_length=100)
+    village: Optional[str] = Field("", max_length=100)
+    phone: Optional[str] = Field("", max_length=30)
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    location_note: Optional[str] = Field("", max_length=300)
+    text: Optional[str] = Field("", max_length=1000)
+    lang: str = Field("en", pattern=r"^[a-z]{2}$")
+    created_at: int = Field(gt=0)
+
+class SosPatchBody(BaseModel):
+    status: str = Field(pattern=r"^(Received|In Progress|Responded|Cancelled)$")
+    note: Optional[str] = Field("", max_length=300)
 
 # ---------------------------------------------------------------- public routes
 @app.get("/api/health")
@@ -537,6 +650,110 @@ def admin_user_patch(uid: int, b: UserPatch, u=Depends(admin_only)):
         if b.active is not None:
             c.execute("UPDATE users SET active=? WHERE id=?", (1 if b.active else 0, uid))
             if not b.active: c.execute("DELETE FROM sessions WHERE user_id=?", (uid,))
+# ---------------------------------------------------------------- announcements (offline vault sync)
+@app.get("/api/announcements")
+def get_announcements(category: Optional[str] = None):
+    with db() as c:
+        now = now_ms()
+        if category:
+            rows = c.execute("SELECT id,title,content,category,author_role,created_at,expires_at FROM announcements WHERE category=? AND (expires_at IS NULL OR expires_at>?) ORDER BY created_at DESC LIMIT 50", (category, now)).fetchall()
+        else:
+            rows = c.execute("SELECT id,title,content,category,author_role,created_at,expires_at FROM announcements WHERE (expires_at IS NULL OR expires_at>?) ORDER BY created_at DESC LIMIT 50", (now,)).fetchall()
+        return [dict(r) for r in rows]
+
+@app.post("/api/announcements", dependencies=[Depends(limiter("announcements", 20, 60))])
+def post_announcement(b: AnnouncementBody, u=Depends(staff)):
+    aid = b.id or f"ann-{now_ms()}-{secrets.token_hex(4)}"
+    with db() as c:
+        c.execute("INSERT OR REPLACE INTO announcements(id,title,content,category,author_role,created_at,expires_at) VALUES(?,?,?,?,?,?,?)",
+                  (aid, b.title.strip(), b.content.strip(), b.category, u["role"], now_ms(), b.expires_at))
+    return {"id": aid, "status": "created"}
+
+# ---------------------------------------------------------------- peer messages (Mode A)
+@app.post("/api/messages/send", dependencies=[Depends(limiter("msg_send", 60, 60))])
+def send_message(b: MessageSendBody, u=Depends(require_user)):
+    with db() as c:
+        same = c.execute("SELECT id,status FROM offline_messages WHERE id=?", (b.id,)).fetchone()
+        if same:
+            return {"id": b.id, "status": "duplicate"}
+        c.execute("""INSERT INTO offline_messages(id,sender_id,sender_name,recipient_id,recipient_name,body,transport,status,created_at)
+                     VALUES(?,?,?,?,?,?,?,?,?)""",
+                  (b.id, u["id"], u["name"] or u["username"], b.recipient_id, b.recipient_name or "", b.body, b.transport or "backend", "pending_delivery", b.created_at))
+    return {"id": b.id, "status": "sent"}
+
+@app.get("/api/messages/inbox")
+def get_inbox(u=Depends(require_user)):
+    with db() as c:
+        uid_str = str(u["id"])
+        rows = c.execute("""SELECT id,sender_id,sender_name,recipient_id,recipient_name,body,transport,status,created_at,delivered_at
+                            FROM offline_messages WHERE recipient_id=? OR recipient_id=? ORDER BY created_at DESC LIMIT 100""",
+                         (uid_str, u["username"])).fetchall()
+        c.execute("UPDATE offline_messages SET status='delivered', delivered_at=? WHERE (recipient_id=? OR recipient_id=?) AND status='pending_delivery'",
+                  (now_ms(), uid_str, u["username"]))
+        return [dict(r) for r in rows]
+
+@app.post("/api/messages/ack")
+def ack_message(b: MessageAckBody, u=Depends(require_user)):
+    with db() as c:
+        c.execute("UPDATE offline_messages SET status=?, ack_at=? WHERE id=?", (b.status, now_ms(), b.message_id))
     return {"ok": True}
+
+# ---------------------------------------------------------------- emergency SOS
+@app.post("/api/sos", dependencies=[Depends(limiter("sos", 30, 60))])
+def report_sos(b: SosBody, u=Depends(current_user)):
+    with db() as c:
+        same = c.execute("SELECT id FROM sos_alerts WHERE id=?", (b.id,)).fetchone()
+        if same:
+            return {"id": b.id, "status": "duplicate"}
+        user_id = u["id"] if u else None
+        name = b.name or (u["name"] if u else "Anonymous")
+        village = b.village or (u["village"] if u else "")
+        c.execute("""INSERT INTO sos_alerts(id,user_id,name,village,phone,latitude,longitude,location_note,text,lang,status,created_at,updated_at)
+                     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                  (b.id, user_id, name, village, b.phone or "", b.latitude, b.longitude, b.location_note or "", b.text or "Emergency SOS", b.lang, "Received", b.created_at, now_ms()))
+        # Keep backward compatibility with existing requests table
+        c.execute("""INSERT OR IGNORE INTO requests(id,name,village,category,type,text,lang,created_at,synced_at,details,user_id,updated_at,status)
+                     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                  (b.id, name, village, "health", "sos", b.text or "EMERGENCY SOS ALERT", b.lang, b.created_at, now_ms(),
+                   json.dumps({"lat": b.latitude, "lon": b.longitude, "note": b.location_note, "phone": b.phone}), user_id, now_ms(), "Received"))
+    return {"id": b.id, "status": "created", "server_time": now_ms()}
+
+@app.patch("/api/sos/{sos_id}")
+def update_sos(sos_id: str, b: SosPatchBody, u=Depends(current_user)):
+    with db() as c:
+        row = c.execute("SELECT * FROM sos_alerts WHERE id=?", (sos_id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "not_found")
+        if b.status == "Cancelled":
+            if u and row["user_id"] and row["user_id"] != u["id"] and u["role"] not in ("OFFICER", "ADMIN"):
+                raise HTTPException(403, "forbidden")
+        elif not u or u["role"] not in ("OFFICER", "ADMIN"):
+            raise HTTPException(403, "forbidden")
+        c.execute("UPDATE sos_alerts SET status=?, updated_at=?, resolved_at=? WHERE id=?",
+                  (b.status, now_ms(), now_ms() if b.status in ("Responded", "Cancelled") else None, sos_id))
+        c.execute("UPDATE requests SET status=?, updated_at=? WHERE id=?", (b.status, now_ms(), sos_id))
+    return {"ok": True, "status": b.status}
+
+@app.get("/api/sos/alerts")
+def get_sos_alerts(u=Depends(staff)):
+    with db() as c:
+        rows = c.execute("SELECT id,user_id,name,village,phone,latitude,longitude,location_note,text,lang,status,created_at,updated_at FROM sos_alerts ORDER BY (status='Received') DESC, created_at DESC LIMIT 50").fetchall()
+        return [dict(r) for r in rows]
+
+# ---------------------------------------------------------------- offline vault resources
+@app.get("/api/vault/resources")
+def get_vault_resources(request: Request):
+    with db() as c:
+        rows = c.execute("SELECT key,category,title_en,title_hi,title_ta,body_en,body_hi,body_ta,icon,updated_at FROM vault_resources ORDER BY category, key").fetchall()
+        items = [dict(r) for r in rows]
+    max_updated = max([x["updated_at"] for x in items], default=0)
+    etag = f'"{hashlib.sha256(str(max_updated).encode()).hexdigest()[:16]}"'
+    if_none_match = request.headers.get("if-none-match")
+    if if_none_match and if_none_match.strip() == etag:
+        return Response(status_code=304)
+    response = JSONResponse(items)
+    response.headers["ETag"] = etag
+    response.headers["Cache-Control"] = "public, max-age=3600"
+    return response
 
 app.mount("/", StaticFiles(directory=BASE.parent / "frontend", html=True), name="static")

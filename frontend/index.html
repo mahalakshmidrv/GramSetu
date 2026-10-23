@@ -20,6 +20,10 @@
       <button data-act="tab" data-arg="farm">🌾 <span data-i18n="n_farm"></span></button>
       <button data-act="tab" data-arg="docs">📄 <span data-i18n="n_docs"></span></button>
       <button data-act="tab" data-arg="sos" class="sos-tab">🚨 <span data-i18n="n_sos"></span></button>
+      <button data-act="tab" data-arg="vault">💾 <span data-i18n="n_vault">Offline Vault</span></button>
+      <button data-act="tab" data-arg="neighbors">👥 <span data-i18n="n_contacts">My Village Contacts</span></button>
+      <button data-act="tab" data-arg="nearby">📡 <span data-i18n="n_nearby">Nearby Connect</span></button>
+      <button data-act="tab" data-arg="messages">💬 <span data-i18n="n_messages">Offline Messages</span></button>
       <button data-act="tab" data-arg="schemes">📋 <span data-i18n="schemes"></span></button>
       <button data-act="tab" data-arg="queue">🔄 <span data-i18n="n_queue"></span></button>
       <button data-act="tab" data-arg="admin" id="tab-admin" class="hidden">🛠 <span data-i18n="n_admin"></span></button>
@@ -63,6 +67,10 @@
       <section id="farm" class="hidden"></section>
       <section id="docs" class="hidden"></section>
       <section id="sos" class="hidden"></section>
+      <section id="vault" class="hidden"></section>
+      <section id="neighbors" class="hidden"></section>
+      <section id="nearby" class="hidden"></section>
+      <section id="messages" class="hidden"></section>
       <section id="schemes" class="hidden"></section>
       <section id="queue" class="hidden"></section>
       <section id="admin" class="hidden"></section>
@@ -94,4 +102,4 @@
  <label for="sos-note" data-i18n="sos_note"></label><textarea id="sos-note" maxlength="500"></textarea>
  <label class="chk"><input type="checkbox" id="sos-loc" checked> <span data-i18n="sos_loc"></span></label>
  <div class="row"><button type="button" class="btn danger" id="sos-yes" data-i18n="sos_yes"></button><button type="button" class="btn ghost" data-act="sosclose" data-i18n="cancel"></button></div></form></dialog>
-<script src="i18n.js"></script><script src="content.js"></script><script src="app.js"></script></body></html>
+<script src="i18n.js"></script><script src="content.js"></script><script src="offline-comm.js"></script><script src="app.js"></script></body></html>
