@@ -89,7 +89,19 @@ GramSetu 2.0 routes messages and requests through three dynamic transport tiers:
 
 ---
 
-## 🚀 How to Run
+## 🌐 Deploy to Render (Cloud Hosting)
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/mahalakshmidrv/GramSetu)
+
+GramSetu 2.0 can be deployed instantly to **Render**:
+1. Go to [Render Dashboard](https://dashboard.render.com) → **New +** → **Blueprint**.
+2. Connect `https://github.com/mahalakshmidrv/GramSetu` (branch `main`).
+3. Render automatically picks up [`render.yaml`](render.yaml) and provisions the web service.
+4. Detailed guide: [`docs/RENDER_DEPLOYMENT.md`](docs/RENDER_DEPLOYMENT.md).
+
+---
+
+## 🚀 How to Run Locally
 
 ### Prerequisites
 * **Python**: 3.10+ (tested on Python 3.14)
