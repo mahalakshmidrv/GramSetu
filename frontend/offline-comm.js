@@ -598,7 +598,7 @@
 
       <div class="card">
         <h3>Android Native Companion Compatibility</h3>
-        <p>The companion Android APK (`gramsetu_mobile`) uses real Android Bluetooth LE GATT advertising (`BluetoothLeAdvertiser`) and RFCOMM server sockets. You can test native transfer between two real physical Android phones with Wi-Fi and mobile data switched off.</p>
+        <p>The companion Android APK (<code>gramsetu_mobile</code>) uses real Android Bluetooth LE GATT advertising (<code>BluetoothLeAdvertiser</code>) and RFCOMM server sockets. You can test native transfer between two real physical Android phones with Wi-Fi and mobile data switched off.</p>
       </div>
     `;
   }

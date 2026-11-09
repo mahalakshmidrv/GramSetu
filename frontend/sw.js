@@ -1,5 +1,5 @@
 // GramSetu service worker. Bump VERSION on every release: old caches are deleted on activate.
-const VERSION = "v6", SHELL = "gramsetu-shell-" + VERSION, DATA = "gramsetu-data-" + VERSION;
+const VERSION = "v7", SHELL = "gramsetu-shell-" + VERSION, DATA = "gramsetu-data-" + VERSION;
 const FILES = ["/", "/index.html", "/app.js", "/offline-comm.js", "/i18n.js", "/content.js", "/style.css", "/manifest.json", "/icon.svg"];
 const PUBLIC_API = ["/api/schemes", "/api/vault/resources", "/api/announcements"];
 

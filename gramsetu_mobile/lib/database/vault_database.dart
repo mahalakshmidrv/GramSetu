@@ -18,9 +18,9 @@ class VaultDatabase {
 
   Future<Database> _initDB(String filePath) async {
     if (kIsWeb) {
-      databaseFactory = databaseFactoryFfiWeb;
+      databaseFactory = databaseFactoryFfiWebNoWebWorker;
       return await openDatabase(
-        filePath,
+        inMemoryDatabasePath,
         version: 1,
         onCreate: _createDB,
       );
